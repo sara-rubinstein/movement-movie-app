@@ -107,8 +107,8 @@ assets/
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd movie_browser_app
+git clone  https://github.com/sara-rubinstein/movement-movie-app.git
+cd movie_browser_app
    ```
 
 2. **Install dependencies**
