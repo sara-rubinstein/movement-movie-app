@@ -11,14 +11,15 @@ class MovieRepository {
   MovieRepository(this._apiClient);
 
   // Search Movies
-  Future<List<MovieModel>> searchMovies(String query, int page) async {
+  Future<(List<MovieModel>,int)> searchMovies(String query, int page) async {
     if (query.trim().isEmpty) {
       throw EmptySearchError();
     }
-
-    final data = await _apiClient.searchMovies(query, page);
-    final List<dynamic> results = data['Search'] ?? [];
-    return results.map((json) => MovieModel.fromJson(json)).toList();
+final data = await _apiClient.searchMovies(query, page);
+  final List<dynamic> results = data['Search'] ?? [];
+  final int total = int.tryParse(data['totalResults'] ?? '0') ?? 0; // ✅ grab total
+  final movies = results.map((json) => MovieModel.fromJson(json)).toList();
+  return (movies, total); // ✅ return both
   }
 
   // Get Movie Details

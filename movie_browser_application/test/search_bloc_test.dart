@@ -40,7 +40,7 @@ void main() {
       'emits [SearchLoading, SearchSuccess] when SearchMovies succeeds',
       build: () {
         when(() => mockRepository.searchMovies(testQuery, 1))
-            .thenAnswer((_) async => testMovies);
+            .thenAnswer((_) async => testMovies,10);
         when(() => mockRepository.addToSearchHistory(testQuery))
             .thenAnswer((_) async => {});
         return searchBloc;

@@ -35,17 +35,18 @@ class SearchSuccess extends SearchState {
   final List<MovieModel> movies;
   final String query;
   final int currentPage;
-  final bool hasMore;
+  final int totalResults; // ✅ Track total from API
+  final bool hasMore;     // ✅ Derived properly
 
   const SearchSuccess({
     required this.movies,
     required this.query,
     required this.currentPage,
-    this.hasMore = true,
-  });
+    required this.totalResults,
+  }) : hasMore = movies.length < totalResults; // ✅ Real check
 
   @override
-  List<Object?> get props => [movies, query, currentPage, hasMore];
+  List<Object?> get props => [movies, query, currentPage, totalResults];
 }
 
 class SearchError extends SearchState {

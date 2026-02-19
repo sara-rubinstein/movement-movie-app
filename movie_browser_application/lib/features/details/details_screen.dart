@@ -100,7 +100,7 @@ class _DetailsScreenContent extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Showing cached data (offline mode)',
+                      context.tr('cached_data'),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),

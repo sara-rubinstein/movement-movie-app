@@ -9,7 +9,11 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
   final MovieRepository _repository;
   String _currentQuery = '';
   int _currentPage = 1;
+  int _totalResults = 0;
   List<MovieModel> _currentMovies = [];
+
+  // ✅ Guard against duplicate LoadMore calls while already loading
+  bool _isLoadingMore = false;
 
   SearchBloc(this._repository) : super(const SearchInitial()) {
     on<SearchMovies>(_onSearchMovies);
@@ -23,30 +27,27 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     SearchMovies event,
     Emitter<SearchState> emit,
   ) async {
-    if (event.isNewSearch) {
-      _currentQuery = event.query;
-      _currentPage = 1;
-      _currentMovies = [];
-      emit(const SearchLoading());
-    } else {
-      emit(SearchLoading(currentMovies: _currentMovies, isLoadingMore: false));
-    }
+    _currentQuery = event.query;
+    _currentPage = 1;
+    _currentMovies = [];
+    _totalResults = 0;
+    _isLoadingMore = false;
+
+    emit(const SearchLoading());
 
     try {
-      final movies = await _repository.searchMovies(_currentQuery, _currentPage);
-      
-      if (event.isNewSearch) {
-        _currentMovies = movies;
-        await _repository.addToSearchHistory(_currentQuery);
-      } else {
-        _currentMovies.addAll(movies);
-      }
+      // ✅ Repository now returns a record with movies + totalResults
+      final (movies,total) = await _repository.searchMovies(_currentQuery, _currentPage);
+      _currentMovies = movies;
+      _totalResults = total;
+
+      await _repository.addToSearchHistory(_currentQuery);
 
       emit(SearchSuccess(
         movies: List.from(_currentMovies),
         query: _currentQuery,
         currentPage: _currentPage,
-        hasMore: movies.length == 10, // Assuming 10 results per page
+        totalResults: _totalResults,
       ));
     } on AppError catch (e) {
       emit(SearchError(e, currentMovies: _currentMovies));
@@ -59,43 +60,36 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     LoadMoreMovies event,
     Emitter<SearchState> emit,
   ) async {
-    if (state is SearchSuccess) {
-      final currentState = state as SearchSuccess;
-      
-      if (!currentState.hasMore) return;
+    // ✅ Prevent duplicate concurrent loads
+    if (_isLoadingMore) return;
 
-      emit(SearchLoading(currentMovies: _currentMovies, isLoadingMore: true));
+    final currentState = state;
+    if (currentState is! SearchSuccess || !currentState.hasMore) return;
 
-      try {
-        _currentPage++;
-        final movies = await _repository.searchMovies(_currentQuery, _currentPage);
-        _currentMovies.addAll(movies);
+    _isLoadingMore = true;
+    emit(SearchLoading(currentMovies: _currentMovies, isLoadingMore: true));
 
-        emit(SearchSuccess(
-          movies: List.from(_currentMovies),
-          query: _currentQuery,
-          currentPage: _currentPage,
-          hasMore: movies.length == 10,
-        ));
-      } on AppError catch (e) {
-        _currentPage--; // Rollback page increment
-        emit(SearchError(e, currentMovies: _currentMovies));
-        emit(SearchSuccess(
-          movies: List.from(_currentMovies),
-          query: _currentQuery,
-          currentPage: _currentPage,
-          hasMore: true,
-        ));
-      } catch (e) {
-        _currentPage--;
-        emit(SearchError(GenericError(e.toString()), currentMovies: _currentMovies));
-        emit(SearchSuccess(
-          movies: List.from(_currentMovies),
-          query: _currentQuery,
-          currentPage: _currentPage,
-          hasMore: true,
-        ));
-      }
+    try {
+      _currentPage++;
+      final (movies, total) = await _repository.searchMovies(_currentQuery, _currentPage);
+      _currentMovies.addAll(movies);
+      _totalResults = total;
+
+      emit(SearchSuccess(
+        movies: List.from(_currentMovies),
+        query: _currentQuery,
+        currentPage: _currentPage,
+        totalResults: _totalResults,
+      ));
+    } on AppError catch (e) {
+      _currentPage--;
+      // ✅ Single emit — no double emit crash
+      emit(SearchError(e, currentMovies: _currentMovies));
+    } catch (e) {
+      _currentPage--;
+      emit(SearchError(GenericError(e.toString()), currentMovies: _currentMovies));
+    } finally {
+      _isLoadingMore = false;
     }
   }
 
@@ -106,7 +100,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     try {
       final history = await _repository.getSearchHistory();
       emit(SearchInitial(searchHistory: history));
-    } catch (e) {
+    } catch (_) {
       emit(const SearchInitial());
     }
   }
@@ -119,9 +113,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
       await _repository.removeFromSearchHistory(event.query);
       final history = await _repository.getSearchHistory();
       emit(SearchInitial(searchHistory: history));
-    } catch (e) {
-      // Handle error silently
-    }
+    } catch (_) {}
   }
 
   Future<void> _onClearSearchHistory(
@@ -131,8 +123,6 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     try {
       await _repository.clearSearchHistory();
       emit(const SearchInitial(searchHistory: []));
-    } catch (e) {
-      // Handle error silently
-    }
+    } catch (_) {}
   }
 }

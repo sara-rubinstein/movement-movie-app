@@ -10,6 +10,7 @@
   "add_to_favorites": "Add to Favorites",
   "remove_from_favorites": "Remove from Favorites",
   "no_favorites": "No favorite movies yet",
+  "cached_data": "Showing cached data (offline mode)",
   "error_network": "Network error. Please check your connection.",
   "error_api": "API error occurred. Please try again.",
   "error_empty_search": "Please enter a search term",
